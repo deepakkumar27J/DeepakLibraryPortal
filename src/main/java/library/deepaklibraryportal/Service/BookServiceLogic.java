@@ -47,6 +47,14 @@ public class BookServiceLogic implements BookService{
             throw new Exception("No book found for student with Id "+studentId);
         }
         Collection<BorrowedBooksDates> books = _student.getBorrowedBooks();
+        Iterator<BorrowedBooksDates> i = books.iterator();
+
+        while(i.hasNext()) {
+            BorrowedBooksDates e = i.next();
+            if (e.getReturnedDate()!=null) {
+                i.remove();
+            }
+        }
         return books;
     }
 
@@ -67,7 +75,15 @@ public class BookServiceLogic implements BookService{
                 }
             }
             Book _book = bookDetail(Math.toIntExact(bookId));
-
+            BorrowedBooksDates _borrowedOne =  borrowHistory.findByBookIdAndStudentId(bookId,studentId);
+            if(_borrowedOne.getReturnedDate()!=null){
+                _borrowedOne.setBorrowDate(borrowingDetail.getBorrowDate());
+                _borrowedOne.setReturnDate(borrowingDetail.getReturnDate());
+                _borrowedOne.setReturnedDate(null);
+                borrowHistory.save(_borrowedOne);
+                return "{\"already\":\"true\"}";
+            }
+            else {
             BorrowedBooksDates newBorrow1 = new BorrowedBooksDates();
             newBorrow1.setStudent(student);
             newBorrow1.setBook(_book);
@@ -87,7 +103,7 @@ public class BookServiceLogic implements BookService{
                         return newBorrow;
                     })
                     .collect(Collectors.toList())
-            );
+            );}
             return _book;
         }).orElseThrow(()-> new Exception("No student with id = "+studentId));
     }
@@ -106,7 +122,11 @@ public class BookServiceLogic implements BookService{
             Book _book = bookDetail(Math.toIntExact(bookId));
 
             BorrowedBooksDates _borrowedOne =  borrowHistory.findByBookIdAndStudentId(bookId,studentId);
+            if(_borrowedOne.getReturnedDate()!=null){
+                return "{\"already\":\"true\"}";
+            }
             _borrowedOne.setReturnedDate(borrowingDetail.getReturnedDate());
+            borrowHistory.save(_borrowedOne);
             if(borrowingDetail.getReturnedDate().after(_borrowedOne.getReturnDate())) {
                 // Create Invoice
                 String uri = "http://localhost:8081/invoice";
@@ -121,8 +141,7 @@ public class BookServiceLogic implements BookService{
                 // Invoice Created
                 return out.getBody();
             }
-            borrowHistory.save(_borrowedOne);
-            return "Successfully returned";
+            return "{\"return\":\"true\"}";
         }).orElseThrow(()-> new Exception("No student with id = "+studentId));
 
         return response;
